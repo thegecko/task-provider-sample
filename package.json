@@ -17,7 +17,7 @@
 		"Other"
 	],
 	"activationEvents": [
-		"onCommand:workbench.action.tasks.runTask"
+		"onStartupFinished"
 	],
 	"main": "./out/extension",
 	"browser": "./out/extension",
@@ -54,6 +54,12 @@
 						"description": "Additional build flags."
 					}
 				}
+			}
+		],
+		"commands": [
+			{
+				"command": "task-provider-samples.custombuildscript",
+				"title": "Run Custom Build Script"
 			}
 		]
 	},

@@ -5,20 +5,30 @@
 import * as vscode from 'vscode';
 
 let customTaskProvider: vscode.Disposable | undefined;
+let command: vscode.Disposable | undefined;
 
 export function activate(_context: vscode.ExtensionContext): void {
-	const workspaceRoot = (vscode.workspace.workspaceFolders && (vscode.workspace.workspaceFolders.length > 0))
-		? vscode.workspace.workspaceFolders[0].uri.fsPath : undefined;
-	if (!workspaceRoot) {
-		return;
-	}
+	const buildTaskProvider = new CustomBuildTaskProvider();
 
-	customTaskProvider = vscode.tasks.registerTaskProvider(CustomBuildTaskProvider.CustomBuildScriptType, new CustomBuildTaskProvider(workspaceRoot));
+	customTaskProvider = vscode.tasks.registerTaskProvider(CustomBuildTaskProvider.CustomBuildScriptType, buildTaskProvider);
+	command = vscode.commands.registerCommand('task-provider-samples.custombuildscript', async () => {
+		const tasks = await vscode.tasks.fetchTasks({ type: CustomBuildTaskProvider.CustomBuildScriptType });
+		if (!tasks.length) {
+			vscode.window.showWarningMessage('No custom build tasks defined, creating one....');
+			const task = buildTaskProvider.getTask('32', ['watch']);
+			vscode.tasks.executeTask(task);
+	} else {
+			vscode.tasks.executeTask(tasks[0]);
+		}
+	});
 }
 
 export function deactivate(): void {
 	if (customTaskProvider) {
 		customTaskProvider.dispose();
+	}
+	if (command) {
+		command.dispose();
 	}
 }
 
@@ -44,8 +54,6 @@ export class CustomBuildTaskProvider implements vscode.TaskProvider {
 	// then a simple ShellExecution or ProcessExecution should be enough.
 	// Since our build has this shared state, the CustomExecution is used below.
 	private sharedState: string | undefined;
-
-	constructor(private workspaceRoot: string) { }
 
 	public async provideTasks(): Promise<vscode.Task[]> {
 		return this.getTasks();
@@ -78,7 +86,7 @@ export class CustomBuildTaskProvider implements vscode.TaskProvider {
 		return this.tasks;
 	}
 
-	private getTask(flavor: string, flags: string[], definition?: CustomBuildTaskDefinition): vscode.Task {
+	public getTask(flavor: string, flags: string[], definition?: CustomBuildTaskDefinition): vscode.Task {
 		if (definition === undefined) {
 			definition = {
 				type: CustomBuildTaskProvider.CustomBuildScriptType,
@@ -89,7 +97,7 @@ export class CustomBuildTaskProvider implements vscode.TaskProvider {
 		return new vscode.Task(definition, vscode.TaskScope.Workspace, `${flavor} ${flags.join(' ')}`,
 			CustomBuildTaskProvider.CustomBuildScriptType, new vscode.CustomExecution(async (): Promise<vscode.Pseudoterminal> => {
 				// When the task is executed, this callback will run. Here, we setup for running the task.
-				return new CustomBuildTaskTerminal(this.workspaceRoot, flavor, flags, () => this.sharedState, (state: string) => this.sharedState = state);
+				return new CustomBuildTaskTerminal(flags, () => this.sharedState, (state: string) => this.sharedState = state);
 			}));
 	}
 }
@@ -102,7 +110,7 @@ class CustomBuildTaskTerminal implements vscode.Pseudoterminal {
 
 	private fileWatcher: vscode.FileSystemWatcher | undefined;
 
-	constructor(private workspaceRoot: string, private flavor: string, private flags: string[], private getSharedState: () => string | undefined, private setSharedState: (state: string) => void) {
+	constructor(private flags: string[], private getSharedState: () => string | undefined, private setSharedState: (state: string) => void) {
 	}
 
 	open(initialDimensions: vscode.TerminalDimensions | undefined): void {
