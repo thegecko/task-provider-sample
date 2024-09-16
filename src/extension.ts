@@ -18,7 +18,8 @@ export function activate(_context: vscode.ExtensionContext): void {
 			const task = buildTaskProvider.getTask('32', ['watch']);
 			vscode.tasks.executeTask(task);
 	} else {
-			vscode.tasks.executeTask(tasks[0]);
+		vscode.window.showInformationMessage(`Found ${tasks.length} tasks`);
+		vscode.tasks.executeTask(tasks[0]);
 		}
 	});
 }
